@@ -30,6 +30,9 @@
 
 import time
 import os
+import wandb
+
+from datetime import datetime
 from collections import deque
 import statistics
 
@@ -52,6 +55,13 @@ class OnPolicyRunner:
         self.cfg=train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
         self.policy_cfg = train_cfg["policy"]
+        self.wandb_run_name = (
+            datetime.now().strftime("%b%d_%H-%M-%S")
+            + "_"
+            + train_cfg["runner"]["experiment_name"]
+            + "_"
+            + train_cfg["runner"]["run_name"]
+        )
         self.device = device
         self.env = env
         if self.env.num_privileged_obs is not None:
@@ -84,6 +94,12 @@ class OnPolicyRunner:
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
         # initialize writer
         if self.log_dir is not None and self.writer is None:
+            wandb.init(
+                project="XBot",
+                sync_tensorboard=True,
+                name=self.wandb_run_name,
+                config=self.all_cfg,
+            )
             self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
