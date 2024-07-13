@@ -146,8 +146,8 @@ class PaiCfgPPO(LeggedRobotCfgPPO):
     class runner(LeggedRobotCfgPPO.runner):
         policy_class_name = 'HIMActorCritic'
         algorithm_class_name = 'HIMPPO'
-        num_steps_per_env = 100 # per iteration
-        max_iterations = 200000 # number of policy updates
+        num_steps_per_env = 60 # per iteration
+        max_iterations = 2000 # number of policy updates
         
         save_interval = 20 # check for potential saves every this many iterations
         experiment_name = "pai_ppo"

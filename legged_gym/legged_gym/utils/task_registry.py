@@ -186,6 +186,7 @@ class TaskRegistry:
         train_cfg_dict = class_to_dict(train_cfg)
         
         # 创建训练算法对象
+        print("log_dir:",log_dir)
         runner = HIMOnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
         
         # 保存恢复路径并在创建新日志目录之前加载模型
