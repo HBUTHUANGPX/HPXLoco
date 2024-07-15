@@ -165,7 +165,7 @@ class LeggedRobot(BaseTask):
         self.check_termination()
         self.compute_reward()
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
-        termination_privileged_obs = self.compute_observations(env_ids)
+        termination_privileged_obs = self.compute_termination_observations(env_ids)
         self.reset_idx(env_ids)
         self.compute_observations()  # in some cases a simulation step might be required to refresh some obs (for example body positions)
 
@@ -1279,6 +1279,36 @@ class LeggedRobot(BaseTask):
         points[:, :, 1] = grid_y.flatten()
         return points
 
+    def _init_base_height_points(self):
+        """Returns points at which the height measurments are sampled (in base frame)
+
+        Returns:
+            [torch.Tensor]: Tensor of shape (num_envs, self.num_base_height_points, 3)
+        """
+        y = torch.tensor(
+            [-0.2, -0.15, -0.1, -0.05, 0.0, 0.05, 0.1, 0.15, 0.2],
+            device=self.device,
+            requires_grad=False,
+        )
+        x = torch.tensor(
+            [-0.15, -0.1, -0.05, 0.0, 0.05, 0.1, 0.15],
+            device=self.device,
+            requires_grad=False,
+        )
+        grid_x, grid_y = torch.meshgrid(x, y)
+
+        self.num_base_height_points = grid_x.numel()
+        points = torch.zeros(
+            self.num_envs,
+            self.num_base_height_points,
+            3,
+            device=self.device,
+            requires_grad=False,
+        )
+        points[:, :, 0] = grid_x.flatten()
+        points[:, :, 1] = grid_y.flatten()
+        return points
+    
     def _get_heights(self, env_ids=None):
         """Samples heights of the terrain at required points around each robot.
             The points are offset by the base's position and rotated by the base's yaw

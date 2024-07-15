@@ -75,7 +75,7 @@ class PaiCfg(LeggedRobotCfg):
         # mesh_type = 'trimesh'
         curriculum = False
         # rough terrain only:
-        measure_heights = False
+        measure_heights = True
         static_friction = 0.6
         dynamic_friction = 0.6
         terrain_length = 8.
@@ -129,7 +129,8 @@ class PaiCfg(LeggedRobotCfg):
         # decimation: Number of control action updates @ sim DT per policy DT
         decimation = 10  # 100hz
         # decimation = 20  # 100hz
-
+        control_type = 'P' 
+        
     class sim(LeggedRobotCfg.sim):
         dt = 0.001  # 1000 Hz
         substeps = 1  # 2
