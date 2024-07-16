@@ -244,7 +244,7 @@ if __name__ == "__main__":
             decimation = 10
 
         class robot_config:
-            kps = np.array(
+            kps = 1.0*np.array(
                 [40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40, 40], dtype=np.double
             )
             kds = 2*np.array(
@@ -266,7 +266,7 @@ if __name__ == "__main__":
             )
             tau_limit = 10.0 * np.ones(12, dtype=np.double)
 
-    policy = torch.jit.load(args.load_model + "policy.pt")
+    policy = torch.jit.load(args.load_model + "him_policy.pt")
     policy1 = torch.jit.load(args.load_model + "policy_1.pt")
     policy2 = torch.jit.load(args.load_model + "policy_2.pt")
     run_mujoco(policy, Sim2simCfg())

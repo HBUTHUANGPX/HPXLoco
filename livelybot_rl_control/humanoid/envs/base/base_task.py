@@ -46,6 +46,7 @@ class BaseTask():
         self.sim_params = sim_params
         self.physics_engine = physics_engine
         self.sim_device = sim_device
+        print("BaseTask self.sim_device:",self.sim_device)
         sim_device_type, self.sim_device_id = gymutil.parse_device_str(
             self.sim_device)
         self.headless = headless

@@ -42,7 +42,7 @@ from rsl_rl.runners import OnPolicyRunner, HIMOnPolicyRunner
 from humanoid import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 from .helpers import get_args, update_cfg_from_args, class_to_dict, get_load_path, set_seed, parse_sim_params
 from humanoid.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobotCfgPPO
-
+# from humanoid.envs.pai.pai_env import PaiCfg, PaiCfgPPO,PaiFreeEnv
 class TaskRegistry():
     def __init__(self):
         self.task_classes = {}
@@ -146,14 +146,19 @@ class TaskRegistry():
         else:
             log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
         
+        # print("make_alg_runner train_cfg: ", train_cfg)
         train_cfg_dict = class_to_dict(train_cfg)
         env_cfg_dict = class_to_dict(self.env_cfg_for_wandb)
         all_cfg = {**train_cfg_dict, **env_cfg_dict}
         
         runner_class = eval(train_cfg_dict["runner_class_name"])
+        
+        # print("make_alg_runner runner_class: ", runner_class)
+        print("make_alg_runner args.rl_device: ", args.rl_device)
         runner = runner_class(env, all_cfg, log_dir, device=args.rl_device)
         #save resume path before creating a new log_dir
         resume = train_cfg.runner.resume
+        print("make_alg_runner resume: ", resume)
         if resume:
             # load previously trained model
             resume_path = get_load_path(log_root, load_run=train_cfg.runner.load_run, checkpoint=train_cfg.runner.checkpoint)

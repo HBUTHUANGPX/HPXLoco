@@ -169,4 +169,5 @@ if __name__ == '__main__':
     RENDER = True
     FIX_COMMAND = True
     args = get_args()
+    print(args)
     play(args)
