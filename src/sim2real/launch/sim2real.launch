@@ -2,7 +2,7 @@
   <!-- <rosparam file="$(find livelybot_description)/robot_param/12dof_STM32H730_model_P_Hector_params_livelybot.yaml" command="load" /> -->
   <!-- <rosparam file="/home/sunteng/control_ws/src/livelybot_robot/src/livelybot_description/robot_param/18dof_STM32H730_model_H_Hector_params.yaml" command="load" /> -->
   <include file='$(find livelybot_description)/launch/livelybot_description.launch' />
-  <!-- <include file='$(find pai_12dof_v2_0312)/launch/display.launch'/> -->
+  <include file='$(find pai_12dof_v2_0312)/launch/display.launch'/>
   <node pkg="sim2real" name="sim2real" type="sim2real" output="screen" />
   <node pkg="yesense_imu" type="yesense_imu_node" name="yesense_imu_node" required="true" output = "screen" >
     <param name="yesense_port"      type="string" value="/dev/ttyACM"/>

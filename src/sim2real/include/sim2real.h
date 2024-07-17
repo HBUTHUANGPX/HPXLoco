@@ -131,15 +131,13 @@ private:
     struct Config{
         std::string policy_path;
         int num_actions = 12, num_single_obs = 47, frame_stack = 15;
-        float action_scales = 0.25, tau_limit = 10.0 , clip_observations = 18.0, clip_actions = 3.0, dt = 0.001;
+        float action_scales = 0.25, tau_limit = 15.0 , clip_observations = 18.0, clip_actions = 18.0, dt = 0.001;
         float lin_vel_scale = 2.0, ang_vel_scale = 1.0, dof_pos_scale = 1.0, dof_vel_scale = 0.05;
-
-       // float action_scales = 0.5, tau_limit = 10.0 , clip_observations = 18.0, clip_actions = 3.0, dt = 0.001;
-        // float lin_vel_scale = 1.0, ang_vel_scale = 1.0, dof_pos_scale = 1.0, dof_vel_scale = 0.5;
 
         int map_index[12] = {5, 4, 3, 2, 1, 0,  11, 10, 9, 8, 7, 6};
         // float motor_direction[12] = {-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0};
-        float motor_direction[12] = {-1.0, 1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+        float motor_direction[12] = {-1.0, 1.0, -1.0, -1.0, 1.0, 1.0,
+                                     -1.0, 1.0, 1.0, 1.0, 1.0, 1.0};
     } cfg;
     struct EncosImuData
     {       
@@ -151,7 +149,7 @@ private:
         double linear_acc_cov[9];
     };
     struct Command{
-        float vx = 0.3, vy = 0.0, dyaw = 0.0;
+        float vx = 1.0, vy = 0.0, dyaw = 0.0;
     } cmd;
     ros::NodeHandle n;
     livelybot_serial::robot rb;
@@ -188,6 +186,7 @@ private:
     float dynamic_offset_hip;
     float dynamic_offset_knee;
     float dynamic_offset_ankle;
+
     void OdomCallBack_(const sensor_msgs::Imu::ConstPtr &odom)
     {
         // ROS_INFO("OdomCallBack_");

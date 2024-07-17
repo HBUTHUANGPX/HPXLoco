@@ -188,7 +188,6 @@ def run_mujoco(policy, cfg: PaiCfg, policy_encoder = None ):
                 print(encoder_input[:5])
                 action[:] = policy(encoder_input)[0].detach().numpy()
             
-            
             action = np.clip(
                 action, -cfg.normalization.clip_actions, cfg.normalization.clip_actions
             )

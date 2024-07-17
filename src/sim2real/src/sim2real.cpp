@@ -288,33 +288,12 @@ void Robot::write()
     {
         target_q[i] = (action[i] * cfg.action_scales + params.init_dof_pos[0][i].item<double>()) * cfg.motor_direction[i];
     }
-    // if(target_q[2] > 0.0)target_q[2] = 1.4*target_q[2];
-    // if(target_q[8] > 0.0)target_q[8] = 1.4*target_q[8];
+
     for (int i = 0; i < 12; ++i)
     {
         urdf_target_state.urdf_target_q[i] = target_q[i];
     }
     urdf_target_pub.publish(urdf_target_state);
-    // rviz_target_pos.header.stamp = ros::Time::now();
-    // for(int i = 0; i < 12; ++i){
-    //     rviz_target_pos.position[i] = action[i] * cfg.action_scales;
-    //     // ROS_INFO("rviz target pos is %f",q[i]);
-    // }
-    // rviz_target_pub.publish(rviz_target_pos);
-
-    // double scale_size = 2;
-    // target_q[2] = target_q[2] * scale_size;
-    // target_q[3] = target_q[3] * scale_size;
-    // target_q[8] = target_q[8] * scale_size;
-    // target_q[9] = target_q[9] * scale_size;
-    // target_q[2] = target_q[2] * 0.9;
-    // target_q[3] = target_q[3] * 0.9;
-    // target_q[8] = target_q[8] * 0.9;
-    // target_q[9] = target_q[9] * 0.9;
-
-    // std_msgs::Float64 float_msg;
-    // float_msg.data = target_q[0];
-    // rev_pub.publish(float_msg);
 
     target_q[3] = target_q[3] - target_q[2];
     target_q[9] = target_q[9] - target_q[8];
@@ -326,76 +305,20 @@ void Robot::write()
 
     ankle_ikinematics(target_q4, target_q5, target_q[4], target_q[5]);
     ankle_ikinematics(target_q10, target_q11, target_q[10], target_q[11]);
-    // ROS_INFO("theta_pL: %f, theta_rL: %f, theta_1L: %f, theta_2L: %f", target_q4, target_q5, target_q[4], target_q[5]);
-    // ROS_INFO("theta_pR: %f, theta_rR: %f, theta_1R: %f, theta_2R: %f", target_q10, target_q11, target_q[10], target_q[11]);
-    for (int i = 0; i < cfg.num_actions; i++)
-    {
-        // target_q_record[i] = target_q[i];
-        target_q[i] = target_q[i];
-        // target_q[i] = 0;
-    }
-
-    for (int i = 0; i < 12; ++i)
-    {
+    for(int i = 0; i < 12; ++i){
         target_msg.target_q[i] = target_q[i];
-    }
+    }    
     target_pub.publish(target_msg);
-
+    dynamic_offset_hip = -0.260;
+    dynamic_offset_knee = 0.055;
+    dynamic_offset_ankle = 0.0;
+    float offset[12] = {0, 0, dynamic_offset_hip, dynamic_offset_knee, 0, 0,
+                        0, 0, dynamic_offset_hip, dynamic_offset_knee, 0, 0};
     for (int i = 0; i < cfg.num_actions; i++)
     {
-        // dynamic_offset_hip = -0.255;
-        // dynamic_offset_knee = -0.05;
-        // dynamic_offset_ankle = 0.0;
-
-        // dynamic_offset_hip = -0.265;
-        // dynamic_offset_knee = 0.11;
-        // dynamic_offset_ankle = 0.0;
-
-        dynamic_offset_hip = -0.260;
-        dynamic_offset_knee = 0.055;
-        dynamic_offset_ankle = 0.0;
-
-        if ((i == 2))
-        {
-            rb.fresh_cmd_dynamic_config(target_q[i] - dynamic_offset_hip, 0, 0, params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(), cfg.map_index[i]);
-        }
-        else if ((i == 8))
-        {
-            rb.fresh_cmd_dynamic_config(target_q[i] - dynamic_offset_hip, 0, 0, params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(), cfg.map_index[i]);
-        }
-        else if ((i == 3))
-        {
-            rb.fresh_cmd_dynamic_config(target_q[i] - dynamic_offset_knee, 0, 0, params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(), cfg.map_index[i]);
-        }
-        else if ((i == 9))
-        {
-            rb.fresh_cmd_dynamic_config(target_q[i] - dynamic_offset_knee, 0, 0, params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(), cfg.map_index[i]);
-        }
-        else if ((i == 4) || (i == 11))
-        {
-            rb.fresh_cmd_dynamic_config(target_q[i] - dynamic_offset_ankle, 0, 0, params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(), cfg.map_index[i]);
-        }
-        else if ((i == 5) || (i == 10))
-        {
-            rb.fresh_cmd_dynamic_config(target_q[i] + dynamic_offset_ankle, 0, 0, params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(), cfg.map_index[i]);
-        }
-        // else if ( i == 4){
-        //     rb.fresh_cmd_dynamic_config(target_q[i],0,0,params.rl_kp[0][i].item<double>(),params.rl_kd[0][i].item<double>(),cfg.map_index[i]);
-        // }
-        // else if ( i == 5){
-        //     rb.fresh_cmd_dynamic_config(target_q[i],0,0,params.rl_kp[0][i].item<double>(),params.rl_kd[0][i].item<double>(),cfg.map_index[i]);
-        // }
-        // else if ( i == 10){
-        //     rb.fresh_cmd_dynamic_config(target_q[i],0,0,params.rl_kp[0][i].item<double>(),params.rl_kd[0][i].item<double>(),cfg.map_index[i]);
-        // }
-        // else if ( i == 11){
-        //     rb.fresh_cmd_dynamic_config(target_q[i],0,0,params.rl_kp[0][i].item<double>(),params.rl_kd[0][i].item<double>(),cfg.map_index[i]);
-        // }
-        else
-        {
-            rb.fresh_cmd_dynamic_config(target_q[i], 0, 0, params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(), cfg.map_index[i]);
-        }
-        // rb.fresh_cmd_dynamic_config(target_q[i]*2,0,0,params.rl_kp[0][i].item<double>(),params.rl_kd[0][i].item<double>(),cfg.map_index[i]);
+        rb.fresh_cmd_dynamic_config(target_q[i] - offset[i], 0, 0,
+                                    params.rl_kp[0][i].item<double>(), params.rl_kd[0][i].item<double>(),
+                                    cfg.map_index[i]);
     }
     rb.motor_send_2();
 }
@@ -433,10 +356,7 @@ void Robot::update_action()
         {
             action[i] = -cfg.clip_actions;
         }
-        // action[i] = std::max(std::min(action[i], cfg.clip_actions), -cfg.clip_actions);
-        // std::cout<<action[i] * 0.25<<" ";
     }
-    // std::cout<<std::endl;
     return;
 }
 
@@ -454,7 +374,7 @@ void Robot::update_obs()
     obs.segment(5, 12) = q * cfg.dof_pos_scale;
     obs.segment(17, 12) = dq * cfg.dof_vel_scale;
     obs.segment(29, 12) = action;
-    obs.segment(41, 3) = base_ang_vel * 0.25;
+    obs.segment(41, 3) = base_ang_vel;
     obs.segment(44, 3) = eu_ang;
     for (int i = 0; i < cfg.num_single_obs; ++i)
     {
@@ -466,17 +386,10 @@ void Robot::update_obs()
         {
             obs[i] = -cfg.clip_observations;
         }
-        // obs[i] = std::max(std::min(obs[i], cfg.clip_observations), -cfg.clip_observations);
-        // std::cout<<obs[i] <<" ";
     }
-    // std::cout<<std::endl;
     count_lowlevel += 10;
     hist_obs.push_back(obs);
     hist_obs.pop_front();
-    // std::cout<<hist_obs<<std::endl;
-    // std::cout<<std::endl;
-
-    // cmd_pub.publish(action[0]);
 }
 
 bool Robot::setupImu()
@@ -693,7 +606,7 @@ void Robot::run()
 void executable()
 {
     ros::Rate r(100);
-    Robot rbt("/home/hpx/HPXLoco/src/sim2real/policy/2024_0716_HIM_1_policy.pt");
+    Robot rbt("/home/hpx/HPXLoco/src/sim2real/policy/2024_0716_HIM_2_policy.pt");
     // while(1){
 
     // }
