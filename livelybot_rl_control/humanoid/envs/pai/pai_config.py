@@ -203,7 +203,7 @@ class PaiCfg(LeggedRobotCfg):
         max_dist = 0.2
         # put some settings here for LLM parameter tuning
         target_joint_pos_scale = 0.17    # rad
-        target_feet_height = 0.06       # m
+        target_feet_height = 0.02       # m
         cycle_time = 0.64                # sec
         # if true negative total rewards are clipped at zero (avoids early termination problems)
         only_positive_rewards = True
