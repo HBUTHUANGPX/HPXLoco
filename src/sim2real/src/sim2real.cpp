@@ -606,7 +606,7 @@ void Robot::run()
 void executable()
 {
     ros::Rate r(100);
-    Robot rbt("/home/hpx/HPXLoco/src/sim2real/policy/2024_0716_HIM_2_policy.pt");
+    Robot rbt("/home/hpx/HPXLoco/src/sim2real/policy/policy_1_height_0.03.pt");
     // while(1){
 
     // }

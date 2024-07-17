@@ -149,7 +149,7 @@ private:
         double linear_acc_cov[9];
     };
     struct Command{
-        float vx = 1.0, vy = 0.0, dyaw = 0.0;
+        float vx = 0.3, vy = 0.0, dyaw = 0.0;
     } cmd;
     ros::NodeHandle n;
     livelybot_serial::robot rb;
