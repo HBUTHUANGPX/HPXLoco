@@ -239,7 +239,7 @@ class PaiCfg(LeggedRobotCfg):
             torques = -1e-5
             dof_vel = -5e-4
             dof_acc = -1e-7
-            collision = -1.
+            collision = -1
 
     class normalization:
         class obs_scales:
