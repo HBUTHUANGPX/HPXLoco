@@ -276,9 +276,6 @@ class PaiFreeEnv(LeggedRobot):
         sin_pos = torch.sin(2 * torch.pi * phase).unsqueeze(1)
         cos_pos = torch.cos(2 * torch.pi * phase).unsqueeze(1)
 
-        stance_mask = self._get_gait_phase()
-        contact_mask = self.contact_forces[:, self.feet_indices, 2] > 5.0
-
         self.command_input = torch.cat(
             (sin_pos, cos_pos, self.commands[:, :3] * self.commands_scale), dim=1
         )
@@ -308,7 +305,7 @@ class PaiFreeEnv(LeggedRobot):
             )
         else:
             obs_now = obs_buf.clone()
-            
+
         if self.cfg.terrain.measure_heights:
             heights = (
                 torch.clip(
@@ -318,12 +315,8 @@ class PaiFreeEnv(LeggedRobot):
                 )
                 * self.obs_scales.height_measurements
             )
-            heights += (2 * torch.rand_like(heights) - 1)
+            heights += 2 * torch.rand_like(heights) - 1
             obs_now = torch.cat((obs_now, heights), dim=-1)
-
-        
-        # self.obs_history.append(obs_now)
-        # self.critic_history.append(self.privileged_obs_buf)
 
         return torch.cat(
             (obs_now[:, :73], self.privileged_obs_buf[:, : 73 * 2]), dim=-1
