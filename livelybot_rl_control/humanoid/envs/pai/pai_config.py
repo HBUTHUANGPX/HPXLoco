@@ -209,13 +209,14 @@ class PaiCfg(LeggedRobotCfg):
         only_positive_rewards = True
         # tracking reward = exp(error*sigma)
         tracking_sigma = 5
-        max_contact_force = 700  # forces above this value are penalized
+        max_contact_force  = 700  # forces above this value are penalized
 
         class scales:
             # reference motion tracking
             joint_pos = 1.6                 # 1.6
-            feet_clearance_r = 1.
-            feet_clearance_l = 1.
+            feet_clearance_r = -1e-4
+            feet_clearance_l = -1e-4
+            # feet_clearance = 1.
             feet_contact_number = 1.2
             # gait
             feet_air_time = 1.

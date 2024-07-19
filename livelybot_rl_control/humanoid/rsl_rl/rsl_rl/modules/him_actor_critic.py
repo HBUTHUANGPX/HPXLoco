@@ -167,8 +167,22 @@ class HIMActorCritic(nn.Module):
         with torch.no_grad():
             vel, latent = self.estimator(obs_history)
         actor_input = torch.cat((obs_history[:,:self.num_one_step_obs], vel, latent), dim=-1)
+        if torch.isnan(actor_input).any() or torch.isinf(actor_input).any():
+            if torch.isnan(actor_input).any():
+                raise ValueError("actor_input contains NaN values")
+            elif torch.isinf(actor_input).any():
+                raise ValueError("mean contains Inf values")
         mean = self.actor(actor_input)
-        self.distribution = Normal(mean, mean*0. + self.std)
+        std = mean*0. + self.std
+        if torch.isnan(mean).any() or torch.isinf(mean).any():
+            if torch.isnan(mean).any():
+                raise ValueError("mean contains NaN values")
+            elif torch.isinf(mean).any():
+                raise ValueError("mean contains Inf values")
+
+        if torch.isnan(std).any() or torch.isinf(std).any() or (std <= 0).any():
+            raise ValueError("std contains NaN, Inf values, or non-positive values")
+        self.distribution = Normal(mean, std)
 
     def act(self, obs_history=None, **kwargs):
         self.update_distribution(obs_history)
