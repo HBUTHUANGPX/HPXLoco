@@ -49,6 +49,7 @@ class PaiFreeEnv(LeggedRobot):
         self.num_one_step_obs = self.cfg.env.num_one_step_observations
         self.last_feet_r = 0.05
         self.last_feet_l = 0.05
+        self.last_feet = [0.05,0.05]
         self.last_feet_z = 0.05
         self.feet_height = torch.zeros((self.num_envs, 2), device=self.device)
         self.feet_height_r = torch.zeros((self.num_envs), device=self.device)
@@ -551,36 +552,27 @@ class PaiFreeEnv(LeggedRobot):
         return rew_pos
 
     def _reward_feet_clearance_r(self):
-        contact = self.return_contact_mask(self.feet_indices[0])
-        feet_r = self.rigid_state[:, self.feet_indices[0], 2] - 0.05
-        delta_r = feet_r - self.last_feet_r
-        self.feet_height_r[:] += delta_r
-        self.last_feet_r = feet_r
-        swing_mask = 1 - self._get_gait_phase()
-
-        rew_pos = (
-            torch.abs(self.feet_height_r - self.cfg.rewards.target_feet_height) < 0.01
-        )
-        rew_pos_mask = rew_pos * swing_mask[:, 0]
-        self.feet_height_r *= ~contact
-        # print("rew_pos_mask: ",rew_pos_mask.size())
-        return rew_pos_mask
+        
+        return self._feet_clearance(0)
 
     def _reward_feet_clearance_l(self):
-        contact = self.return_contact_mask(self.feet_indices[1])
-        feet_l = self.rigid_state[:, self.feet_indices[1], 2] - 0.05
-        delta_l = feet_l - self.last_feet_l
-        self.feet_height_l[:] += delta_l
-        self.last_feet_l = feet_l
-        swing_mask = 1 - self._get_gait_phase()
+        
+        return self._feet_clearance(1)
 
+    def _feet_clearance(self,indices):
+        contact = self.return_contact_mask(self.feet_indices[indices])
+        feet = self.rigid_state[:, self.feet_indices[indices], 2]
+        delta = feet - self.last_feet[indices]
+        self.feet_height[:,indices] += delta
+        self.last_feet[indices] = feet
+        swing_mask = 1 - self._get_gait_phase()
         rew_pos = (
             torch.abs(self.feet_height_l - self.cfg.rewards.target_feet_height) < 0.01
         )
-        rew_pos_mask = rew_pos * swing_mask[:, 1]
+        rew_pos_mask = rew_pos * swing_mask[:, indices]
         self.feet_height_l *= ~contact
         return rew_pos_mask
-
+    
     def _reward_low_speed(self):
         """
         Rewards or penalizes the robot based on its speed relative to the commanded speed.
