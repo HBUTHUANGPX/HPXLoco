@@ -164,16 +164,16 @@ class PaiCfg(LeggedRobotCfg):
         com_displacement_range = [-0.05, 0.05]
         
         randomize_link_mass = False
-        link_mass_range = [0.4, 1.6]
+        link_mass_range = [0.8, 1.2]
         
         randomize_kp = True
-        kp_range = [0.6, 1.4]
+        kp_range = [0.8, 1.2]
         
         randomize_kd = True
-        kd_range = [0.6, 1.4]
+        kd_range = [0.8, 1.2]
         
         randomize_motor_strength = True
-        motor_strength_range = [0.2, 1.8]
+        motor_strength_range = [0.8, 1.2]
         
         push_robots = True
         push_interval_s = 16
@@ -203,7 +203,7 @@ class PaiCfg(LeggedRobotCfg):
         max_dist = 0.2
         # put some settings here for LLM parameter tuning
         target_joint_pos_scale = 0.17    # rad
-        target_feet_height = 0.02       # m
+        target_feet_height = 0.05       # m
         cycle_time = 0.64                # sec
         # if true negative total rewards are clipped at zero (avoids early termination problems)
         only_positive_rewards = True
