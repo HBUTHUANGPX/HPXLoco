@@ -203,7 +203,7 @@ class PaiCfg(LeggedRobotCfg):
         max_dist = 0.2
         # put some settings here for LLM parameter tuning
         target_joint_pos_scale = 0.17    # rad
-        target_feet_height = 0.05       # m
+        target_feet_height = 0.02       # m
         cycle_time = 0.64                # sec
         # if true negative total rewards are clipped at zero (avoids early termination problems)
         only_positive_rewards = True
@@ -214,9 +214,9 @@ class PaiCfg(LeggedRobotCfg):
         class scales:
             # reference motion tracking
             joint_pos = 1.6                 # 1.6
-            feet_clearance_r = -1e-4
-            feet_clearance_l = -1e-4
-            # feet_clearance = 1.
+            feet_clearance_r = 1.
+            feet_clearance_l = 1.
+            # feet_clearance = 1e-4
             feet_contact_number = 1.2
             # gait
             feet_air_time = 1.
