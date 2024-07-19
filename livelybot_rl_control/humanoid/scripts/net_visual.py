@@ -8,3 +8,5 @@ policy = torch.jit.load("/home/hpx/HPXLoco/livelybot_rl_control/logs/Pai_ppo/exp
 # policy  = torch.load('/home/hpx/HPXLoco/livelybot_rl_control/logs/Pai_ppo/Jul14_19-19-06_v1/model_0.pt')
 
 print(policy)
+a= [1,2,3,4]
+print(a[:2])

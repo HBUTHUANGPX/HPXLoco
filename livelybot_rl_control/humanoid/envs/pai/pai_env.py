@@ -47,8 +47,12 @@ class PaiFreeEnv(LeggedRobot):
         super().__init__(cfg, sim_params, physics_engine, sim_device, headless)
         self.cfg: PaiCfg
         self.num_one_step_obs = self.cfg.env.num_one_step_observations
-        self.last_feet_z = 0.05
+        self.last_feet_r = 0.05
+        self.last_feet_l = 0.05
+        self.last_feet = 0.05
         self.feet_height = torch.zeros((self.num_envs, 2), device=self.device)
+        self.feet_height_r = torch.zeros((self.num_envs, 2), device=self.device)
+        self.feet_height_l = torch.zeros((self.num_envs, 2), device=self.device)
         self.reset_idx(torch.tensor(range(self.num_envs), device=self.device))
         self.compute_observations()
 
@@ -181,6 +185,12 @@ class PaiFreeEnv(LeggedRobot):
         )
         return super().step(actions)
 
+    def return_contact_mask(self):
+        # print(torch.norm(self.contact_forces[:, self.feet_indices, :3], p=2, dim=2) > 5.0)
+        return (
+            torch.norm(self.contact_forces[:, self.feet_indices, :3], p=2, dim=2) > 5.0
+        )
+
     def compute_observations(self):
         # print("compute_observations-------------:\r\n")
         phase = self._get_phase()
@@ -190,7 +200,7 @@ class PaiFreeEnv(LeggedRobot):
         cos_pos = torch.cos(2 * torch.pi * phase).unsqueeze(1)
 
         stance_mask = self._get_gait_phase()
-        contact_mask = self.contact_forces[:, self.feet_indices, 2] > 5.0
+        contact_mask = self.return_contact_mask()
 
         self.command_input = torch.cat(
             (sin_pos, cos_pos, self.commands[:, :3] * self.commands_scale), dim=1
@@ -200,7 +210,6 @@ class PaiFreeEnv(LeggedRobot):
         dq = self.dof_vel * self.obs_scales.dof_vel
 
         diff = self.dof_pos - self.ref_dof_pos
-
         self.privileged_obs_buf = torch.cat(
             (
                 self.command_input,  # 2 + 3
@@ -376,7 +385,7 @@ class PaiFreeEnv(LeggedRobot):
         and the speed of the feet. A contact threshold is used to determine if the foot is in contact
         with the ground. The speed of the foot is calculated and scaled by the contact condition.
         """
-        contact = self.contact_forces[:, self.feet_indices, 2] > 5.0
+        contact = self.return_contact_mask()
         foot_speed_norm = torch.norm(
             self.rigid_state[:, self.feet_indices, 10:12], dim=2
         )
@@ -390,7 +399,7 @@ class PaiFreeEnv(LeggedRobot):
         checking the first contact with the ground after being in the air. The air time is
         limited to a maximum value for reward calculation.
         """
-        contact = self.contact_forces[:, self.feet_indices, 2] > 5.0
+        contact = self.return_contact_mask()
         stance_mask = self._get_gait_phase()
         self.contact_filt = torch.logical_or(
             torch.logical_or(contact, stance_mask), self.last_contacts
@@ -407,7 +416,7 @@ class PaiFreeEnv(LeggedRobot):
         Calculates a reward based on the number of feet contacts aligning with the gait phase.
         Rewards or penalizes depending on whether the foot contact matches the expected gait phase.
         """
-        contact = self.contact_forces[:, self.feet_indices, 2] > 5.0
+        contact = self.return_contact_mask()
         stance_mask = self._get_gait_phase()
         reward = torch.where(contact == stance_mask, 1, -0.3)
         return torch.mean(reward, dim=1)
@@ -545,6 +554,34 @@ class PaiFreeEnv(LeggedRobot):
         )
         rew_pos = torch.sum(rew_pos * swing_mask, dim=1)
         self.feet_height *= ~contact
+        return rew_pos
+
+    def _reward_feet_clearance_r(self):
+        contact = self.return_contact_mask()
+        feet_r = torch.norm(self.rigid_state[:, self.feet_indices[0], :3], p=2) - 0.05
+        delta_r = feet_r - self.last_feet_r
+        self.feet_height_r += delta_r
+        self.last_feet_r = feet_r
+        swing_mask = 1 - self._get_gait_phase()
+        rew_pos = (
+            torch.abs(self.feet_height_r - self.cfg.rewards.target_feet_height) < 0.01
+        )
+        rew_pos = torch.sum(rew_pos * swing_mask, dim=1)
+        self.feet_height_r *= ~contact
+        return rew_pos
+
+    def _reward_feet_clearance_l(self):
+        contact = self.return_contact_mask()
+        feet_l = torch.norm(self.rigid_state[:, self.feet_indices[1], :3], p=2) - 0.05
+        delta_l = feet_l - self.last_feet_l
+        self.feet_height_l += delta_l
+        self.last_feet_l = feet_l
+        swing_mask = 1 - self._get_gait_phase()
+        rew_pos = (
+            torch.abs(self.feet_height_l - self.cfg.rewards.target_feet_height) < 0.01
+        )
+        rew_pos = torch.sum(rew_pos * swing_mask, dim=1)
+        self.feet_height_l *= ~contact
         return rew_pos
 
     def _reward_low_speed(self):
