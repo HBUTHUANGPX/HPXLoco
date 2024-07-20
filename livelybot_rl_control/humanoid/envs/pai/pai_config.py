@@ -198,7 +198,7 @@ class PaiCfg(LeggedRobotCfg):
             heading = [-3.14, 3.14]
 
     class rewards:
-        base_height_target = 0.33
+        base_height_target = 0.38
         min_dist = 0.15
         max_dist = 0.2
         # put some settings here for LLM parameter tuning
@@ -214,8 +214,8 @@ class PaiCfg(LeggedRobotCfg):
         class scales:
             # reference motion tracking
             joint_pos = 1.6                 # 1.6
-            feet_clearance_r = 1.
-            feet_clearance_l = 1.
+            feet_clearance_r = 1e-4
+            feet_clearance_l = 1e-4
             # feet_clearance = 1e-4
             feet_contact_number = 1.2
             # gait

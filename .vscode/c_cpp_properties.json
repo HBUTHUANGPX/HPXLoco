@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/opt/ros/noetic/include/**",
-                "${workspaceFolder}/devel/.private/sim2real_msg/include"
+                "${workspaceFolder}/devel/.private/sim2real_msg/include",
+                "${workspaceFolder}/PhaseGuidedControl/controller/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
