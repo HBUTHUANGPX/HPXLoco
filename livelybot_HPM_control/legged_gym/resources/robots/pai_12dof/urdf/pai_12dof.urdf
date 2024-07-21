@@ -6,7 +6,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 -->
 <robot name="pai_12dof_v2_0312">
 	<mujoco>
-		<compiler meshdir="package://pai_12dof_v2_0312/meshes/" balanceinertia="true" discardvisual="false" />
+		<compiler meshdir="../meshes/" balanceinertia="true" discardvisual="false" />
 	</mujoco>
 	<link name="base_link">
 		<inertial>
@@ -17,7 +17,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/base_link.STL" />
+				<mesh filename="../meshes/base_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -39,7 +39,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/l_hip_yaw_link.STL" />
+				<mesh filename="../meshes/l_hip_yaw_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -68,7 +68,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/l_hip_roll_link.STL" />
+				<mesh filename="../meshes/l_hip_roll_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -97,7 +97,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/l_thigh_link.STL" />
+				<mesh filename="../meshes/l_thigh_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -126,7 +126,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/l_calf_link.STL" />
+				<mesh filename="../meshes/l_calf_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -155,7 +155,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/l_ankle_pitch_link.STL" />
+				<mesh filename="../meshes/l_ankle_pitch_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -184,7 +184,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/l_ankle_roll_link.STL" />
+				<mesh filename="../meshes/l_ankle_roll_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -193,7 +193,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<collision>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/l_ankle_roll_link.STL" />
+				<mesh filename="../meshes/l_ankle_roll_link.STL" />
 			</geometry>
 		</collision>
 	</link>
@@ -213,7 +213,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/r_hip_yaw_link.STL" />
+				<mesh filename="../meshes/r_hip_yaw_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -242,7 +242,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/r_hip_roll_link.STL" />
+				<mesh filename="../meshes/r_hip_roll_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -271,7 +271,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/r_thigh_link.STL" />
+				<mesh filename="../meshes/r_thigh_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -300,7 +300,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/r_calf_link.STL" />
+				<mesh filename="../meshes/r_calf_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -329,7 +329,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/r_ankle_pitch_link.STL" />
+				<mesh filename="../meshes/r_ankle_pitch_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -358,7 +358,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<visual>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/r_ankle_roll_link.STL" />
+				<mesh filename="../meshes/r_ankle_roll_link.STL" />
 			</geometry>
 			<material name="">
 				<color rgba="0.75294 0.75294 0.75294 1" />
@@ -367,7 +367,7 @@ For more information, please see http://wiki.ros.org/sw_urdf_exporter
 		<collision>
 			<origin xyz="0 0 0" rpy="0 0 0" />
 			<geometry>
-				<mesh filename="package://pai_12dof_v2_0312/meshes/r_ankle_roll_link.STL" />
+				<mesh filename="../meshes/r_ankle_roll_link.STL" />
 			</geometry>
 		</collision>
 	</link>

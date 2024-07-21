@@ -106,8 +106,9 @@ class PaiRoughCfg(LeggedRobotCfg):
 
     class asset(LeggedRobotCfg.asset):
         file = "{LEGGED_GYM_ROOT_DIR}/resources/robots/pai_12dof/urdf/pai_12dof.urdf"
-        name = "aliengo"
-        foot_name = "foot"
+        name = "pai_12dof"
+        foot_name = "ankle_roll"
+        knee_name = "calf"
         penalize_contacts_on = ["thigh", "calf", "base"]
         terminate_after_contacts_on = ["base"]
         disable_gravity = False
@@ -115,9 +116,9 @@ class PaiRoughCfg(LeggedRobotCfg):
         fix_base_link = False  # fixe the base of the robot
         default_dof_drive_mode = 3  # see GymDofDriveModeFlags (0 is none, 1 is pos tgt, 2 is vel tgt, 3 effort)
         self_collisions = 1  # 1 to disable, 0 to enable...bitwise filter
-        replace_cylinder_with_capsule = True  # replace collision cylinders with capsules, leads to faster/more stable simulation
+        replace_cylinder_with_capsule = False  # replace collision cylinders with capsules, leads to faster/more stable simulation
         flip_visual_attachments = (
-            True  # Some .obj meshes must be flipped from y-up to z-up
+            False  # Some .obj meshes must be flipped from y-up to z-up
         )
 
         density = 0.001
@@ -157,7 +158,7 @@ class PaiRoughCfg(LeggedRobotCfg):
         initial_joint_pos_range = [0.5, 1.5]
 
         disturbance = True
-        disturbance_range = [-30.0, 30.0]
+        disturbance_range = [-5.0, 5.0]
         disturbance_interval = 8
 
         push_robots = True
@@ -167,29 +168,36 @@ class PaiRoughCfg(LeggedRobotCfg):
         delay = True
 
     class rewards(LeggedRobotCfg.rewards):
-        class scales(LeggedRobotCfg.scales):
-            termination = -0.0
-            tracking_lin_vel = 1.0
-            tracking_ang_vel = 0.5
-            lin_vel_z = -2.0
-            ang_vel_xy = -0.05
+        class scales:
+            tracking_lin_vel = 1.2
+            tracking_ang_vel = 1.1
+            track_lin_ang_vel = 0.5
+            vel_mismatch_exp = 0.5
             orientation = -0.2
-            dof_acc = -2.5e-7
-            joint_power = -2e-5
             base_height = -1.0
+            base_acc = 0.2
+            
+            dof_acc = -2.5e-7
+            dof_vel = -5e-4
+            torques = -1e-5
+            joint_power = -2e-5
+            smoothness = -0.001
+            
             foot_clearance = -0.01
-            action_rate = -0.01
-            smoothness = -0.01
-            feet_air_time = 0.0
-            collision = -0.0
-            feet_stumble = -0.0
-            stand_still = -0.0
-            torques = -0.0
-            dof_vel = -0.0
-            dof_pos_limits = 0.0
-            dof_vel_limits = 0.0
-            torque_limits = 0.0
-
+            feet_air_time = 0.1
+            feet_distance = 0.16   # 0.2
+            knee_distance = 0.16   # 0.2
+            
+            # termination = -0.0
+            # collision = -0.0
+            # feet_stumble = -0.0
+            # stand_still = -0.0
+            # dof_pos_limits = 0.0
+            # dof_vel_limits = 0.0
+            # torque_limits = 0.0
+            
+        min_dist = 0.15
+        max_dist = 0.2
         only_positive_rewards = False  # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25  # tracking reward = exp(-error^2/sigma)
         soft_dof_pos_limit = (
@@ -198,11 +206,11 @@ class PaiRoughCfg(LeggedRobotCfg):
         soft_dof_vel_limit = 0.95
         soft_torque_limit = 0.95
         base_height_target = 0.38
-        max_contact_force = 100.0  # forces above this value are penalized
+        max_contact_force = 700.0  # forces above this value are penalized
         clearance_height_target = -0.34
 
     class normalization(LeggedRobotCfg.normalization):
-        class obs_scales(LeggedRobotCfg.obs_scales):
+        class obs_scales(LeggedRobotCfg.normalization.obs_scales):
             lin_vel = 2.0
             ang_vel = 0.25
             dof_pos = 1.0
@@ -216,7 +224,7 @@ class PaiRoughCfg(LeggedRobotCfg):
         add_noise = True
         noise_level = 1.0  # scales other values
 
-        class noise_scales(LeggedRobotCfg.normnoise_scalesalization):
+        class noise_scales(LeggedRobotCfg.noise.noise_scales):
             dof_pos = 0.01
             dof_vel = 1.5
             lin_vel = 0.1
@@ -230,7 +238,7 @@ class PaiRoughCfg(LeggedRobotCfg):
         gravity = [0.0, 0.0, -9.81]  # [m/s^2]
         up_axis = 1  # 0 is y, 1 is z
 
-        class physx(LeggedRobotCfg.physx):
+        class physx(LeggedRobotCfg.sim.physx):
             num_threads = 10
             solver_type = 1  # 0: pgs, 1: tgs
             num_position_iterations = 4
@@ -265,7 +273,7 @@ class PaiRoughCfgPPO(LeggedRobotCfgPPO):
     class runner(LeggedRobotCfgPPO.runner):
         policy_class_name = "HIMActorCritic"
         algorithm_class_name = "HIMPPO"
-        num_steps_per_env = 100  # per iteration
+        num_steps_per_env = 50  # per iteration
         max_iterations = 200000  # number of policy updates
         # logging
         save_interval = 20  # check for potential saves every this many iterations

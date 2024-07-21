@@ -214,8 +214,8 @@ class PaiCfg(LeggedRobotCfg):
         class scales:
             # reference motion tracking
             joint_pos = 1.6                 # 1.6
-            feet_clearance_r = 1e-4
-            feet_clearance_l = 1e-4
+            feet_clearance_r = 1.#1e-4
+            feet_clearance_l = 1.#1e-4
             # feet_clearance = 1e-4
             feet_contact_number = 1.2
             # gait

@@ -50,3 +50,4 @@ if __name__ == '__main__':
     print(args)
     print("=======================================================")
     train(args, headless=True)
+    # train(args, headless=False)

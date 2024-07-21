@@ -19,6 +19,7 @@ from legged_gym.utils.helpers import class_to_dict
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg
 from .pai_robot_config import PaiRoughCfg
 
+
 class PaiRobot(BaseTask):
     def __init__(
         self, cfg: PaiRoughCfg, sim_params, physics_engine, sim_device, headless
@@ -693,7 +694,6 @@ class PaiRobot(BaseTask):
         """
         # pd controller
         actions_scaled = actions * self.cfg.control.action_scale
-        actions_scaled[:, [0, 3, 6, 9]] *= self.cfg.control.hip_reduction
         self.joint_pos_target = self.default_dof_pos + actions_scaled
 
         control_type = self.cfg.control.control_type
@@ -908,6 +908,9 @@ class PaiRobot(BaseTask):
         self.root_states = gymtorch.wrap_tensor(actor_root_state)
         self.dof_state = gymtorch.wrap_tensor(dof_state_tensor)
         self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_state)
+        self.rigid_state = self.rigid_body_states.view(
+            self.num_envs, self.num_bodies, 13
+        )
         self.dof_pos = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 0]
         self.dof_vel = self.dof_state.view(self.num_envs, self.num_dof, 2)[..., 1]
         self.base_quat = self.root_states[:, 3:7]
@@ -1113,6 +1116,7 @@ class PaiRobot(BaseTask):
         self.reward_functions = []
         self.reward_names = []
         for name, scale in self.reward_scales.items():
+            print(name)
             if name == "termination":
                 continue
             self.reward_names.append(name)
@@ -1230,6 +1234,10 @@ class PaiRobot(BaseTask):
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
+        knee_names = [s for s in body_names if self.cfg.asset.knee_name in s]
+        for s in body_names:
+            print(s)
+        print(knee_names)
         penalized_contact_names = []
         for name in self.cfg.asset.penalize_contacts_on:
             penalized_contact_names.extend([s for s in body_names if name in s])
@@ -1327,6 +1335,14 @@ class PaiRobot(BaseTask):
         for i in range(len(feet_names)):
             self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(
                 self.envs[0], self.actor_handles[0], feet_names[i]
+            )
+
+        self.knee_indices = torch.zeros(
+            len(knee_names), dtype=torch.long, device=self.device, requires_grad=False
+        )
+        for i in range(len(knee_names)):
+            self.knee_indices[i] = self.gym.find_actor_rigid_body_handle(
+                self.envs[0], self.actor_handles[0], knee_names[i]
             )
 
         self.penalised_contact_indices = torch.zeros(
@@ -1648,17 +1664,42 @@ class PaiRobot(BaseTask):
         ang_vel_error = torch.square(self.commands[:, 2] - self.base_ang_vel[:, 2])
         return torch.exp(-ang_vel_error / self.cfg.rewards.tracking_sigma)
 
-    def _reward_lin_vel_z(self):
-        # Penalize z axis base linear velocity
-        return torch.square(self.base_lin_vel[:, 2])
+    def _reward_vel_mismatch_exp(self):
+        lin_mismatch = torch.exp(-torch.square(self.base_lin_vel[:, 2]) * 10)
+        ang_mismatch = torch.exp(-torch.norm(self.base_ang_vel[:, :2], dim=1) * 5.0)
+        c_update = (lin_mismatch + ang_mismatch) / 2.0
+        return c_update
 
-    def _reward_ang_vel_xy(self):
-        # Penalize xy axes base angular velocity
-        return torch.sum(torch.square(self.base_ang_vel[:, :2]), dim=1)
+    def _reward_track_lin_ang_vel(self):
+        # Tracking of linear velocity commands (xy axes)
+        lin_vel_error = torch.norm(
+            self.commands[:, :2] - self.base_lin_vel[:, :2], dim=1
+        )
+        lin_vel_error_exp = torch.exp(-lin_vel_error * 10)
+
+        # Tracking of angular velocity commands (yaw)
+        ang_vel_error = torch.abs(self.commands[:, 2] - self.base_ang_vel[:, 2])
+        ang_vel_error_exp = torch.exp(-ang_vel_error * 10)
+
+        linear_error = 0.2 * (lin_vel_error + ang_vel_error)
+
+        return (lin_vel_error_exp + ang_vel_error_exp) / 2.0 - linear_error
 
     def _reward_orientation(self):
-        # Penalize non flat base orientation
-        return torch.sum(torch.square(self.projected_gravity[:, :2]), dim=1)
+        orientation = torch.exp(-torch.norm(self.projected_gravity[:, :2], dim=1) * 20)
+        return orientation
+
+    def _reward_base_height(self):
+        # Penalize base height away from target
+        base_height = self._get_base_heights()
+        derta = base_height - self.cfg.rewards.base_height_target
+        print("base_height: ",torch.sum(derta) / 4096)
+        rew = torch.exp(torch.square(derta))
+        return rew
+
+    def _reward_base_acc(self):
+        root_acc = self.last_root_vel - self.root_states[:, 7:13]
+        return torch.exp(-torch.norm(root_acc, dim=1) * 3)
 
     def _reward_dof_acc(self):
         # Penalize dof accelerations
@@ -1666,16 +1707,38 @@ class PaiRobot(BaseTask):
             torch.square((self.last_dof_vel - self.dof_vel) / self.dt), dim=1
         )
 
+    def _reward_dof_vel(self):
+        # Penalize dof velocities
+        return torch.sum(torch.square(self.dof_vel), dim=1)
+
+    def _reward_torques(self):
+        # Penalize torques
+        return torch.sum(torch.square(self.torques), dim=1)
+
     def _reward_joint_power(self):
         # Penalize high power
         return torch.sum(torch.abs(self.dof_vel) * torch.abs(self.torques), dim=1)
 
-    def _reward_base_height(self):
-        # Penalize base height away from target
-        base_height = self._get_base_heights()
-        return torch.square(base_height - self.cfg.rewards.base_height_target)
+    def _reward_smoothness(self):
+        # second order smoothness
+        rew = (
+            torch.sum(
+                -torch.square(
+                    (
+                        (self.actions - self.last_actions)
+                        - (self.last_actions - self.last_last_actions)
+                    )
+                ),
+                dim=1,
+            )
+            / 12
+        )
+        print("smoothness:",torch.sum(rew) / 4096)
+        # print(sum)
+        return rew
 
     def _reward_foot_clearance(self):
+        # print("-------self.feet_pos:",self.feet_pos.size())
         cur_footpos_translated = self.feet_pos - self.root_states[:, 0:3].unsqueeze(1)
         footpos_in_body_frame = torch.zeros(
             self.num_envs, len(self.feet_indices), 3, device=self.device
@@ -1698,31 +1761,55 @@ class PaiRobot(BaseTask):
         foot_leteral_vel = torch.sqrt(
             torch.sum(torch.square(footvel_in_body_frame[:, :, :2]), dim=2)
         ).view(self.num_envs, -1)
-        return torch.sum(height_error * foot_leteral_vel, dim=1)
+        rew = torch.sum(height_error * foot_leteral_vel, dim=1)
+        print("foot_clearance height_error:",torch.sum(footpos_in_body_frame[:, :, 2] - self.cfg.rewards.clearance_height_target) / 4096)
 
-    def _reward_action_rate(self):
-        # Penalize changes in actions
-        return torch.sum(torch.square(self.last_actions - self.actions), dim=1)
+        return rew
 
-    def _reward_smoothness(self):
-        # second order smoothness
-        return torch.sum(
-            torch.square(
-                self.actions
-                - self.last_actions
-                - self.last_actions
-                + self.last_last_actions
-            ),
-            dim=1,
-        )
+    def _reward_feet_air_time(self):
+        # Reward long steps
+        # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
+        contact = self.contact_forces[:, self.feet_indices, 2] > 1.0
+        contact_filt = torch.logical_or(contact, self.last_contacts)
+        self.last_contacts = contact
+        first_contact = (self.feet_air_time > 0.0) * contact_filt
+        self.feet_air_time += self.dt
+        rew_airTime = torch.sum(
+            (self.feet_air_time - 0.5) * first_contact, dim=1
+        )  # reward only on first contact with the ground
+        rew_airTime *= (
+            torch.norm(self.commands[:, :2], dim=1) > 0.1
+        )  # no reward for zero command
+        self.feet_air_time *= ~contact_filt
+        print("rew_airTime:",torch.sum(rew_airTime) / 4096)
+        return rew_airTime
 
-    def _reward_torques(self):
-        # Penalize torques
-        return torch.sum(torch.square(self.torques), dim=1)
+    def _reward_feet_distance(self):
+        foot_pos = self.rigid_state[:, self.feet_indices, :2]
+        foot_dist = torch.norm(foot_pos[:, 0, :] - foot_pos[:, 1, :], dim=1)
+        fd = self.cfg.rewards.min_dist
+        max_df = self.cfg.rewards.max_dist
+        d_min = torch.clamp(foot_dist - fd, -0.5, 0.0)
+        d_max = torch.clamp(foot_dist - max_df, 0, 0.5)
+        rew = (
+            torch.exp(-torch.abs(d_min) * 100) + torch.exp(-torch.abs(d_max) * 100)
+        ) / 2
+        print("foot_dist:",torch.sum(foot_dist) / 4096)
+        return rew
 
-    def _reward_dof_vel(self):
-        # Penalize dof velocities
-        return torch.sum(torch.square(self.dof_vel), dim=1)
+    def _reward_knee_distance(self):
+        # print("self.knee_indices: ",self.knee_indices)
+        foot_pos = self.rigid_state[:, self.knee_indices, :2]
+        foot_dist = torch.norm(foot_pos[:, 0, :] - foot_pos[:, 1, :], dim=1)
+        fd = self.cfg.rewards.min_dist
+        max_df = self.cfg.rewards.max_dist / 2
+        d_min = torch.clamp(foot_dist - fd, -0.5, 0.0)
+        d_max = torch.clamp(foot_dist - max_df, 0, 0.5)
+        return (
+            torch.exp(-torch.abs(d_min) * 100) + torch.exp(-torch.abs(d_max) * 100)
+        ) / 2
+
+
 
     def _reward_collision(self):
         # Penalize collisions on selected bodies
@@ -1770,23 +1857,6 @@ class PaiRobot(BaseTask):
             dim=1,
         )
 
-    def _reward_feet_air_time(self):
-        # Reward long steps
-        # Need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
-        contact = self.contact_forces[:, self.feet_indices, 2] > 1.0
-        contact_filt = torch.logical_or(contact, self.last_contacts)
-        self.last_contacts = contact
-        first_contact = (self.feet_air_time > 0.0) * contact_filt
-        self.feet_air_time += self.dt
-        rew_airTime = torch.sum(
-            (self.feet_air_time - 0.5) * first_contact, dim=1
-        )  # reward only on first contact with the ground
-        rew_airTime *= (
-            torch.norm(self.commands[:, :2], dim=1) > 0.1
-        )  # no reward for zero command
-        self.feet_air_time *= ~contact_filt
-        return rew_airTime
-
     def _reward_stumble(self):
         # Penalize feet hitting vertical surfaces
         return torch.any(
@@ -1810,4 +1880,3 @@ class PaiRobot(BaseTask):
             ).clip(min=0.0),
             dim=1,
         )
-
