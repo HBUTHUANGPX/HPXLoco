@@ -1303,6 +1303,7 @@ class PaiRobot(BaseTask):
                 rigid_shape_props_asset, i
             )
             self.gym.set_asset_rigid_shape_properties(robot_asset, rigid_shape_props)
+            print("start_pose.r:--------------",start_pose.r,start_pose.p)
             actor_handle = self.gym.create_actor(
                 env_handle,
                 robot_asset,

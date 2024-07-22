@@ -33,7 +33,7 @@ from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg, LeggedRobot
 
 class AlienGoRoughCfg(LeggedRobotCfg):
     class env(LeggedRobotCfg.env):
-        num_envs = 4096
+        num_envs = 50
         num_one_step_observations = 45
         num_observations = num_one_step_observations * 6
         num_one_step_privileged_obs = (

@@ -77,7 +77,7 @@ class PaiRoughCfg(LeggedRobotCfg):
             heading = [-3.14, 3.14]
 
     class init_state(LeggedRobotCfg.init_state):
-        pos = [0.0, 0.0, 0.38]  # x,y,z [m]
+        pos = [0.0, 0.0, 0.383]  # x,y,z [m]
         default_joint_angles = {  # = target angles [rad] when action = 0.0
             "left_hip_yaw_joint": 0.0,  # [rad]
             "right_hip_yaw_joint": 0.0,  # [rad]
@@ -205,9 +205,9 @@ class PaiRoughCfg(LeggedRobotCfg):
         )
         soft_dof_vel_limit = 0.95
         soft_torque_limit = 0.95
-        base_height_target = 0.38
+        base_height_target = 0.3825
         max_contact_force = 700.0  # forces above this value are penalized
-        clearance_height_target = -0.34
+        clearance_height_target = -0.3457+0.03
 
     class normalization(LeggedRobotCfg.normalization):
         class obs_scales(LeggedRobotCfg.normalization.obs_scales):

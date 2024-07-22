@@ -33,7 +33,7 @@ from .base_config import BaseConfig
 
 class LeggedRobotCfg(BaseConfig):
     class env:
-        num_envs = 4096
+        num_envs = 50
         num_one_step_observations = 45
         num_observations = num_one_step_observations * 6
         num_one_step_privileged_obs = (
@@ -300,7 +300,7 @@ class LeggedRobotCfgPPO(BaseConfig):
     class runner:
         policy_class_name = "HIMActorCritic"
         algorithm_class_name = "HIMPPO"
-        num_steps_per_env = 100  # per iteration
+        num_steps_per_env = 60  # per iteration
         max_iterations = 200000  # number of policy updates
 
         # logging
