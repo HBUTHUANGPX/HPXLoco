@@ -29,6 +29,7 @@ def quat_axis(q, axis=0):
     basis_vec = torch.zeros(q.shape[0], 3, device=q.device)
     basis_vec[:, axis] = 1
     return quat_rotate(q, basis_vec)
+torch.set_printoptions(precision=4, sci_mode=False, linewidth=500, threshold=20000000)
 
 
 def orientation_error(desired, current):
@@ -67,6 +68,14 @@ def control_ik(dpose):
 
 def control_osc(dpose):
     global kp, kd, kp_null, kd_null, default_dof_pos_tensor, mm, j_eef, num_envs, dof_pos, dof_vel, hand_vel
+
+    # print("dpose: ", dpose.size())  # torch.Size([256, 6, 1])
+    # print("default_dof_pos_tensor: ", default_dof_pos_tensor.size())  # torch.Size([6])
+    # print("mm: ", mm.size())  # torch.Size([ 6, 76])
+    # print("j_eef: ", j_eef.size())  # torch.Size([ 6, 6])
+    # print("dof_pos: ", dof_pos.size())  # torch.Size([ 12, 1])
+    # print("dof_vel: ", dof_vel.size())  # torch.Size([ 12, 1])
+    # print("hand_vel: ", hand_vel.size())  # torch.Size([ 6])
     mm_inv = torch.inverse(mm)
     m_eef_inv = j_eef @ mm_inv @ torch.transpose(j_eef, 1, 2)
     m_eef = torch.inverse(m_eef_inv)
@@ -79,16 +88,29 @@ def control_osc(dpose):
     # Nullspace control torques `u_null` prevents large changes in joint configuration
     # They are added into the nullspace of OSC so that the end effector orientation remains constant
     # roboticsproceedings.org/rss07/p31.pdf
+    # print(default_dof_pos_tensor.size())
+    # print(default_dof_pos_tensor.view(1, -1, 1).size())
+    # print(dof_pos.size())
     j_eef_inv = m_eef @ j_eef @ mm_inv
     u_null = kd_null * -dof_vel + kp_null * (
         (default_dof_pos_tensor.view(1, -1, 1) - dof_pos + np.pi) % (2 * np.pi) - np.pi
     )
+    
+    # print(u_null.size())
     u_null = u_null[:, :7]
     u_null = mm @ u_null
     u += (
         torch.eye(7, device=device).unsqueeze(0)
         - torch.transpose(j_eef, 1, 2) @ j_eef_inv
     ) @ u_null
+    print("torch.transpose(j_eef, 1, 2): \r\n", ((torch.eye(7, device=device).unsqueeze(0) - torch.transpose(j_eef, 1, 2)@ j_eef_inv)@ u_null)[0])  # torch.Size([ 6])
+    # print("j_eef_inv: ", j_eef_inv.size())  # torch.Size([ 6])
+    # print("torch.transpose(j_eef, 1, 2) @ j_eef_inv: ", (torch.transpose(j_eef, 1, 2) @ j_eef_inv).size())  # torch.Size([ 6])
+    # print("u.squeeze(-1): ", u.squeeze(-1).size())  # torch.Size([ 6])
+    # print("torch.eye(7, device=device).unsqueeze(0): ", torch.eye(7, device=device).unsqueeze(0).size())  # torch.Size([ 6])
+    # print("u_null: ", u_null.size())  # torch.Size([ 6])
+    # print("u: ", u.size())  # torch.Size([ 6])
+    
     return u.squeeze(-1)
 
 
@@ -139,7 +161,7 @@ sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.8)
 sim_params.dt = 1.0 / 60.0
 sim_params.substeps = 2
 sim_params.use_gpu_pipeline = args.use_gpu_pipeline
-print("sim_params.use_gpu_pipeline:",sim_params.use_gpu_pipeline)
+print("sim_params.use_gpu_pipeline:", sim_params.use_gpu_pipeline)
 if args.physics_engine == gymapi.SIM_PHYSX:
     sim_params.physx.solver_type = 1
     sim_params.physx.num_position_iterations = 8
@@ -175,7 +197,7 @@ viewer = gym.create_viewer(sim, gymapi.CameraProperties())
 if viewer is None:
     raise Exception("Failed to create viewer")
 
-asset_root = "../assets"
+asset_root = "/home/hpx/HPXLoco/livelybot_GYM_control/assets"
 
 # create table asset
 table_dims = gymapi.Vec3(0.6, 1.0, 0.4)
@@ -440,15 +462,15 @@ while not gym.query_viewer_has_closed(viewer):
     # compute position and orientation error
     pos_err = goal_pos - hand_pos
     orn_err = orientation_error(goal_rot, hand_rot)
-    # print(orn_err.size())
     dpose = torch.cat([pos_err, orn_err], -1).unsqueeze(-1)
-
+    # print(pos_err.size(), orn_err.size(), dpose.size())
+    # print(dpose)
     # Deploy control based on type
     if controller == "ik":
         pos_action[:, :7] = dof_pos.squeeze(-1)[:, :7] + control_ik(dpose)
     else:  # osc
         effort_action[:, :7] = control_osc(dpose)
-
+        # print("effort_action[0,:]:\r\n",effort_action)
     # gripper actions depend on distance between hand and box
     close_gripper = (box_dist < grasp_offset + 0.02) | gripped
     # always open the gripper above a certain height, dropping the box and restarting from the beginning

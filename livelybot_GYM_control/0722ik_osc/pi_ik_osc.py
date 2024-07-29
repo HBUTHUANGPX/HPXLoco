@@ -8,9 +8,14 @@ from isaacgym import gymutil
 from isaacgym import gymtorch
 from isaacgym.torch_utils import *
 import time
+from mat_function import *
 
 import pinocchio
-
+debug = True
+if debug:
+    _dt = 1.0/100000.0
+else:
+    _dt = 1.0/100.0
 
 def print_asset_info(asset, name):
     print("======== Asset info %s: ========" % (name))
@@ -103,67 +108,19 @@ def print_actor_info(gym, env, actor_handle):
         print("DOF '%s' has position" % dof_names[i], dof_positions[i])
 
 
-def control_ik(dpose):
-    global damping, j_eef, num_envs
-    # solve damped least squares
-    j_eef_T = torch.transpose(j_eef, 1, 2)
-    lmbda = torch.eye(6, device=device) * (damping**2)
-    u = (j_eef_T @ torch.inverse(j_eef @ j_eef_T + lmbda) @ dpose).view(num_envs, 7)
-    # j_eef @ j_eef_T 计算雅可比矩阵与其转置的乘积，形状为 (num_envs, 6, 6)。
-    # j_eef @ j_eef_T + lmbda 在雅可比矩阵乘积上加上阻尼矩阵，形状为 (num_envs, 6, 6)。
-    # torch.inverse(j_eef @ j_eef_T + lmbda) 计算上述矩阵的逆矩阵，形状为 (num_envs, 6, 6)。
-    # j_eef_T @ torch.inverse(j_eef @ j_eef_T + lmbda) 计算雅可比矩阵转置与逆矩阵的乘积，形状为 (num_envs, 7, 6)。
-    # j_eef_T @ torch.inverse(j_eef @ j_eef_T + lmbda) @ dpose 计算上述结果与 dpose 的乘积，得到关节角度变化 u，形状为 (num_envs, 7, 1)。
-    # u.view(num_envs, 7) 将结果调整为形状 (num_envs, 7)，表示每个环境中的关节角度变化。
-    return u
-
-
-def quaternion_to_rotation_matrix(q):
-    q = q / torch.norm(q)
-    qw, qx, qy, qz = q[3], q[0], q[1], q[2]
-    R = torch.tensor(
-        [
-            [
-                1 - 2 * qy**2 - 2 * qz**2,
-                2 * qx * qy - 2 * qz * qw,
-                2 * qx * qz + 2 * qy * qw,
-            ],
-            [
-                2 * qx * qy + 2 * qz * qw,
-                1 - 2 * qx**2 - 2 * qz**2,
-                2 * qy * qz - 2 * qx * qw,
-            ],
-            [
-                2 * qx * qz - 2 * qy * qw,
-                2 * qy * qz + 2 * qx * qw,
-                1 - 2 * qx**2 - 2 * qy**2,
-            ],
-        ],
-        device=q.device,
-    )
-    return R
-
-
-def create_transformation_matrix(rotation_matrix, position):
-    transformation_matrix = torch.eye(4, device=rotation_matrix.device)
-    transformation_matrix[:3, :3] = rotation_matrix
-    transformation_matrix[:3, 3] = position
-    return transformation_matrix
-
-
 torch.set_printoptions(precision=4, sci_mode=False, linewidth=500, threshold=20000000)
 gym = gymapi.acquire_gym()  # initialize gym
 custom_parameters = [
     {
         "name": "--controller",
         "type": str,
-        "default": "ik",
+        "default": "osc",
         "help": "Controller to use for Franka. Options are {ik, osc}",
     },
     {
         "name": "--num_envs",
         "type": int,
-        "default": 16,
+        "default": 4,
         "help": "Number of environments to create",
     },
 ]
@@ -172,12 +129,19 @@ args = gymutil.parse_arguments(
     custom_parameters=custom_parameters,
 )  # parse arguments
 
-device = args.sim_device if args.use_gpu_pipeline else "cpu"
+# Grab controller
+controller = args.controller
+assert controller in {
+    "ik",
+    "osc",
+}, f"Invalid controller specified -- options are (ik, osc). Got: {controller}"
+
 
 sim_params = gymapi.SimParams()  # create simulation context
 sim_params.gravity = gymapi.Vec3(0.0, 0.0, -9.81)
 sim_params.up_axis = gymapi.UP_AXIS_Z
-sim_params.dt = 1.0 / 60000000.0
+# sim_params.dt = 1.0 / 100.0
+sim_params.dt = _dt
 # sim_params.use_gpu_pipeline = args.use_gpu_pipeline
 print("sim_params.use_gpu_pipeline:", sim_params.use_gpu_pipeline)
 if args.physics_engine == gymapi.SIM_PHYSX:
@@ -234,6 +198,17 @@ if current_asset is None:
 
 # print_asset_info(current_asset, asset_names)
 
+# configure dofs
+dof_props = gym.get_asset_dof_properties(current_asset)
+if controller == "ik":
+    dof_props["driveMode"][:].fill(gymapi.DOF_MODE_POS)
+    dof_props["stiffness"][:].fill(400.0)
+    dof_props["damping"][:].fill(40.0)
+else:  # osc
+    dof_props["driveMode"][:7].fill(gymapi.DOF_MODE_EFFORT)
+    dof_props["stiffness"][:7].fill(0.0)
+    dof_props["damping"][:7].fill(0.0)
+
 # Setup environment spacing
 num_envs = args.num_envs
 num_per_row = int(math.sqrt(num_envs))
@@ -245,8 +220,8 @@ envs = []
 actor_handles = []
 pose = gymapi.Transform()
 shape = (12,)
-structured_array = np.ndarray(shape, dtype=gymapi.DofState.dtype)
-structured_array["pos"] = [
+default_dof_state = np.ndarray(shape, dtype=gymapi.DofState.dtype)
+default_dof_pos = [
     0.0,
     0.0,
     -0.3,
@@ -260,7 +235,8 @@ structured_array["pos"] = [
     0.3,
     0.0,
 ]
-
+default_dof_pos_tensor = to_torch(default_dof_pos, device="cpu")
+default_dof_state["pos"] = default_dof_pos
 feet_r_idxs = []
 feet_l_idxs = []
 base_idxs = []
@@ -271,17 +247,15 @@ for i in range(num_envs):
     env = gym.create_env(sim, env_lower, env_upper, num_per_row)
     envs.append(env)
     # Add actors to environment
-    pose.p = gymapi.Vec3(0.0, 0.0, 0.3825)
+    pose.p = gymapi.Vec3(0.0, 0.0, 0.3855)
     pai_handle = gym.create_actor(env, current_asset, pose, asset_names, -1, -1)
     pai_handles.append(pai_handle)
     actor_count = gym.get_actor_count(env)
-    # Iterate through all actors for the environment
-    actor_handle = gym.get_actor_handle(env, actor_count)
-    actor_handles.append(actor_handle)
+    gym.set_actor_dof_properties(env, pai_handle, dof_props)
     gym.set_actor_dof_states(
         env,
-        actor_handle,
-        structured_array,
+        pai_handle,
+        default_dof_state,
         gymapi.STATE_POS,
     )
     feet_l_idx = gym.find_actor_rigid_body_index(
@@ -303,7 +277,6 @@ for i in range(num_envs):
     base_idxs.append(base_idx)
 
 
-print(joint_transforms)
 gym.subscribe_viewer_keyboard_event(viewer, gymapi.KEY_R, "reset")
 gym.viewer_camera_look_at(viewer, None, gymapi.Vec3(2, 0, 0.5), gymapi.Vec3(-1, 0, 0))
 
@@ -321,7 +294,7 @@ dof_pos = dof_states[:, 0].view(num_envs, 12, 1)
 dof_vel = dof_states[:, 1].view(num_envs, 12, 1)
 
 link_dict = gym.get_asset_rigid_body_dict(current_asset)
-print(link_dict)
+print("link_dict:",link_dict)
 body_names = gym.get_asset_rigid_body_names(current_asset)
 body_index = [link_dict[s] for s in body_names if "base" in s]
 # print("body_index: ", body_index)
@@ -333,24 +306,59 @@ feet_index = [link_dict[s] for s in body_names if "ankle_roll" in s]
 _jacobian = gym.acquire_jacobian_tensor(sim, "pai_12dof")
 jacobian = gymtorch.wrap_tensor(_jacobian)
 print(jacobian.size())
-j_L = jacobian[:, feet_index[0], :, 6:12]
-j_R = jacobian[:, feet_index[1], :, 12:]
+
 
 # get mass matrix tensor
 _massmatrix = gym.acquire_mass_matrix_tensor(sim, "pai_12dof")
 mm = gymtorch.wrap_tensor(_massmatrix)
-# print(mm)
-mm = mm[:, :12, :12]  # only need elements corresponding to the franka arm
+# print("mm.size(): ", mm.size())
+mm = mm[:, :12, :12]
+# print("mm.size(): ", mm.size())
+# print("mm: ", mm[0])
 
 # Set action tensors
 pos_action = torch.zeros_like(dof_pos).squeeze(-1)
 effort_action = torch.zeros_like(pos_action)
 # print(pos_action.size())
+
+
+down_hight = 0.05
+feet_r_baselink_tf_mat_up = get_tf_mat(rb_states, base_idxs, feet_r_idxs)
+feet_l_baselink_tf_mat_up = get_tf_mat(rb_states, base_idxs, feet_l_idxs)
+feet_r_baselink_tf_mat_down = feet_r_baselink_tf_mat_up.clone()
+feet_l_baselink_tf_mat_down = feet_l_baselink_tf_mat_up.clone()
+feet_r_baselink_tf_mat_down[:, 2, 3] = feet_r_baselink_tf_mat_up[:, 2, 3] + down_hight
+feet_l_baselink_tf_mat_down[:, 2, 3] = feet_l_baselink_tf_mat_up[:, 2, 3] + down_hight
+# print(feet_r_baselink_tf_mat_down[0])
+
+baselink_feet_r_tf_mat_up = invert_tf_mat(feet_r_baselink_tf_mat_up)
+baselink_feet_l_tf_mat_up = invert_tf_mat(feet_l_baselink_tf_mat_up)
+baselink_feet_r_tf_mat_down = invert_tf_mat(feet_r_baselink_tf_mat_down)
+baselink_feet_l_tf_mat_down = invert_tf_mat(feet_l_baselink_tf_mat_up)
+
+# print(feet_r_baselink_tf_mat_up[0])
+# print(baselink_feet_r_tf_mat_up[0])
+# print(baselink_feet_r_tf_mat_down[0])
+
+up_vel = down_hight / 2.0
+dt_move = up_vel * sim_params.dt
+# print(dt_move)
+# compute_dpose()
+cont = 0
+dir = -1
+
+damping = 0.05
+
+j_L = jacobian[:, feet_index[0], :, 6:12]
+j_R = jacobian[:, feet_index[1], :, 12:]
 while not gym.query_viewer_has_closed(viewer):
+
     for evt in gym.query_viewer_action_events(viewer):
         if evt.action == "reset" and evt.value > 0:
             gym.set_sim_rigid_body_states(sim, initial_state, gymapi.STATE_ALL)
-    _state = np.copy(gym.get_sim_rigid_body_states(sim, gymapi.STATE_ALL))
+            cont = 0
+            dir = -1
+    # _state = np.copy(gym.get_sim_rigid_body_states(sim, gymapi.STATE_ALL))
     # print("=============================")
     # print(_state[0][0][0][2],_state[6][0][0][2]) #足底默认高0.0368 baselink 高0.3965
     # 足底默认高0.0368 baselink 高0.3825
@@ -364,62 +372,104 @@ while not gym.query_viewer_has_closed(viewer):
     gym.refresh_dof_state_tensor(sim)
     gym.refresh_jacobian_tensors(sim)
     gym.refresh_mass_matrix_tensors(sim)
+    feet_r_baselink_tf_mat_now = get_tf_mat(rb_states, base_idxs, feet_r_idxs)
+    feet_l_baselink_tf_mat_now = get_tf_mat(rb_states, base_idxs, feet_l_idxs)
+    baselink_feet_r_tf_mat_now = invert_tf_mat(feet_r_baselink_tf_mat_now)
+    baselink_feet_l_tf_mat_now = invert_tf_mat(feet_l_baselink_tf_mat_now)
 
-    # print(feet_r_idxs, feet_l_idxs)
-    feet_pos_r_at_world = rb_states[feet_r_idxs, :3]
-    feet_pos_l_at_world = rb_states[feet_l_idxs, :3]
-    base_pos_at_world = rb_states[base_idxs, :3]
+    if dir == 1:  # down
+        feet_r_baselink_tf_mat_target = feet_r_baselink_tf_mat_down
+        feet_l_baselink_tf_mat_target = feet_l_baselink_tf_mat_down
+        baselink_feet_l_tf_mat_target = baselink_feet_l_tf_mat_down
+        baselink_feet_r_tf_mat_target = baselink_feet_r_tf_mat_down
+    elif dir == -1:  # up
+        feet_r_baselink_tf_mat_target = feet_r_baselink_tf_mat_up
+        feet_l_baselink_tf_mat_target = feet_l_baselink_tf_mat_up
+        baselink_feet_r_tf_mat_target = baselink_feet_r_tf_mat_up
+        baselink_feet_l_tf_mat_target = baselink_feet_l_tf_mat_up
 
-    feet_pos_r_at_base = rb_states[feet_r_idxs, :3] - rb_states[base_idxs, :3]
-    feet_pos_l_at_base = rb_states[feet_l_idxs, :3] - rb_states[base_idxs, :3]
+    if controller == "ik":
+        dpose_r = compute_dpose(
+            feet_r_baselink_tf_mat_target, feet_r_baselink_tf_mat_now
+        )
+        dpose_l = compute_dpose(
+            feet_l_baselink_tf_mat_target, feet_l_baselink_tf_mat_now
+        )
+        u_r = control_ik(dpose_r, damping, j_R, num_envs)
+        u_l = control_ik(dpose_l, damping, j_L, num_envs)
+    else:
+        dpose_l = compute_dpose(
+            baselink_feet_l_tf_mat_target, baselink_feet_l_tf_mat_now
+        )
+        dpose_r = compute_dpose(
+            baselink_feet_r_tf_mat_target, baselink_feet_r_tf_mat_now
+        )
+        vel_feet_l_in_base = torch.matmul(j_L, dof_vel[:, :6]).squeeze(-1)
+        vel_base_in_feet_l = transform_velocity_to_feet_frame(
+            vel_feet_l_in_base, feet_r_baselink_tf_mat_now[:, :3, :3]
+        )
+        # print(vel_feet_l_in_base.size(), vel_base_in_feet_l.size())
+        print(vel_feet_l_in_base[0])
+        print(vel_base_in_feet_l[0])
+        u_l = control_osc(
+            dpose_l,
+            torch.flip(default_dof_pos_tensor[:6], [0]),
+            invert_mass_matrix(mm[:, :6, :6], baselink_feet_l_tf_mat_now[:, :3, :3]),
+            invert_jacobian(j_L, baselink_feet_l_tf_mat_now[:, :3, :3]),
+            torch.flip(dof_pos[:, :6], [1]),
+            torch.flip(dof_vel[:, :6], [1]),
+            vel_base_in_feet_l
+        )
+        vel_feet_r_in_base = torch.matmul(j_R, dof_vel[:, :6]).squeeze(-1)
+        vel_base_in_feet_r = transform_velocity_to_feet_frame(
+            vel_feet_r_in_base, feet_r_baselink_tf_mat_now[:, :3, :3]
+        )
+        u_r = control_osc(
+            dpose_r,
+            torch.flip(default_dof_pos_tensor[6:], [0]),
+            invert_mass_matrix(
+                mm[:, 6:12, 6:12], baselink_feet_r_tf_mat_now[:, :3, :3]
+            ),
+            invert_jacobian(j_R, baselink_feet_r_tf_mat_now[:, :3, :3]),
+            torch.flip(dof_pos[:, 6:], [1]),
+            torch.flip(dof_vel[:, 6:], [1]),
+            vel_base_in_feet_r
+        )
+        ...
+    # print(rb_states[base_idxs, 7:][0])
+    # print(rb_states[feet_l_idxs, 7:][0])
+    # print(u_r[0], u_l[0])
+    # print(dof_pos.squeeze(-1)[:, 6:], dof_pos.squeeze(-1)[:, :6])
+    if controller == "ik":
+        pos_action[:, :6] = dof_pos.squeeze(-1)[:, :6] + u_l
+        pos_action[:, 6:] = dof_pos.squeeze(-1)[:, 6:] + u_r
+    else:  # osc
+        effort_action[:, :6] = u_l
+        effort_action[:, 6:] = u_r
 
-    # print(feet_pos_l_at_base)
-
-    feet_rot_r_at_world = rb_states[feet_r_idxs, 3:7]
-    feet_rot_l_at_world = rb_states[feet_l_idxs, 3:7]
-    base_rot_at_world = rb_states[base_idxs, 3:7]
-
-    feet_rot_r_at_base = rb_states[feet_r_idxs, 3:7] - rb_states[base_idxs, 3:7]
-    feet_rot_l_at_base = rb_states[feet_l_idxs, 3:7] - rb_states[base_idxs, 3:7]
-    # print(base_rot_at_world, feet_rot_r_at_world)
-
-    for i in range(1):
-    # for i in range(num_envs):
-        transform = gym.get_actor_joint_transforms(envs[i], pai_handles[i])
-        # print(transform.size())
-        j = 0
-        transformation_matrixs = []
-        for t in transform:
-            position = torch.tensor([t['p']['x'], t['p']['y'], t['p']['z']])
-            quaternion = torch.tensor(
-                [t['r']['x'], t['r']['y'], t['r']['z'], t['r']['w']]
-            )
-            rotation_matrix = quaternion_to_rotation_matrix(quaternion)
-            transformation_matrix = create_transformation_matrix(rotation_matrix, position)
-            print("Transformation matrix:",j)
-            j+=1
-            print(transformation_matrix)
-            transformation_matrixs.append(transformation_matrix)
-        transformation_matrices_tensor = torch.stack(transformation_matrixs)
-        print(transformation_matrices_tensor.shape)
-        feet_r_tf_mt = torch.eye(4)
-        feet_l_tf_mt = torch.eye(4)
-        print(feet_r_tf_mt)
-        for tf_index in range(6):
-            feet_l_tf_mt = torch.inverse(transformation_matrices_tensor[tf_index,:,:]) @ feet_l_tf_mt 
-            feet_r_tf_mt = torch.inverse(transformation_matrices_tensor[tf_index + 6,:,:]) @ feet_r_tf_mt 
-        print(feet_r_tf_mt)
+    gym.set_dof_position_target_tensor(sim, gymtorch.unwrap_tensor(pos_action))
+    gym.set_dof_actuation_force_tensor(sim, gymtorch.unwrap_tensor(effort_action))
+    elapsed_time = gym.get_sim_time(sim)
+    # print(f"Elapsed simulation time: {elapsed_time} seconds, ", dir)
+    if debug:
+        time.sleep(0.01)
+    # time.sleep(0.01)
     # print("jacobian: ",jacobian[0])
     # print(j_L[0])
     # print(j_R[0])
     # for i in jacobian[0]:
     #     a = i[:,6:]
     #     print(a)
-    break
+    # break
     # update the viewer
     gym.step_graphics(sim)
     gym.draw_viewer(viewer, sim, False)
     gym.sync_frame_time(sim)
+    cont += 1
+    if cont > int(2 / sim_params.dt):
+        cont = 0
+        dir *= -1
+        print("turn direction: ", dir)
 
 # Cleanup the simulator
 gym.destroy_viewer(viewer)
